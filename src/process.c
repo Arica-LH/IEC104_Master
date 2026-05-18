@@ -13,6 +13,7 @@
 static int g_pid_fd = -1;
 static char g_pid_path[4096];
 
+/* 对 PID 文件加锁或解锁，防止同一配置启动多个主站实例。 */
 static int set_pidfile_lock(short lock_type)
 {
     struct flock lock;
@@ -26,6 +27,7 @@ static int set_pidfile_lock(short lock_type)
     return fcntl(g_pid_fd, F_SETLK, &lock);
 }
 
+/* 将当前进程转为传统守护进程模式，脱离终端并重定向标准输入输出。 */
 int process_daemonize(void)
 {
     pid_t pid;
@@ -74,6 +76,7 @@ int process_daemonize(void)
     return 0;
 }
 
+/* 创建并锁定 PID 文件，写入当前进程号。 */
 int process_pidfile_acquire(const char *pid_file)
 {
     char pid_buf[64];
@@ -112,6 +115,7 @@ int process_pidfile_acquire(const char *pid_file)
     return 0;
 }
 
+/* 释放 PID 文件锁并删除 PID 文件。 */
 void process_pidfile_release(void)
 {
     if (g_pid_fd >= 0) {

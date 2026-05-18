@@ -42,6 +42,7 @@ slave_port = 2404
 common_address = 1
 pid_file = /tmp/iec104-master.pid
 log_file = /tmp/iec104-master.log
+debug_log_file = /tmp/iec104-master/debug/iec104-master-debug.log
 debug_level = detail
 ```
 
@@ -59,6 +60,8 @@ debug_level = detail
 - `slave_port`：从站 IEC104 端口，默认 `2404`。
 - `common_address`：公共地址，通常由现场规约表确定。
 - `debug_level`：打印等级，`off` 只输出告警和错误，`info` 输出大致运行信息，`detail` 输出详细调试信息。
+- `log_file`：普通日志文件，记录 `INFO/WARN/ERROR`。
+- `debug_log_file`：详细调试日志文件，记录 `DEBUG`，建议放在独立 `debug` 日志目录；程序会自动创建父目录。
 - `general_interrogation_interval_sec`：总召周期，设置为 `0` 表示只在连接成功后总召一次。
 - `test_frame_interval_sec`：链路保活 TESTFR 周期。
 - `reconnect_initial_sec` / `reconnect_max_sec`：断线后的指数退避重连时间。
@@ -108,6 +111,7 @@ sudo systemctl enable --now iec104-master
 systemctl status iec104-master
 journalctl -u iec104-master -f
 tail -f /var/log/iec104-master/iec104-master.log
+tail -f /var/log/iec104-master/debug/iec104-master-debug.log
 ```
 
 服务文件 [systemd/iec104-master.service](systemd/iec104-master.service) 使用：
@@ -115,7 +119,7 @@ tail -f /var/log/iec104-master/iec104-master.log
 - `Restart=always`：进程异常退出后自动拉起。
 - `RestartSec=5`：5 秒后重启。
 - `RuntimeDirectory=iec104-master`：创建 PID 目录。
-- `LogsDirectory=iec104-master`：创建日志目录。
+- `LogsDirectory=iec104-master`：创建基础日志目录，程序会自动创建独立 debug 子目录。
 - `NoNewPrivileges`、`ProtectSystem`、`ProtectHome`：限制服务权限。
 
 ## 代码结构

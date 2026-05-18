@@ -7,6 +7,7 @@
 #include <string.h>
 #include <strings.h>
 
+/* 去除字符串首尾空白字符，用于解析 key=value 配置行。 */
 static char *trim(char *value)
 {
     char *end;
@@ -28,6 +29,7 @@ static char *trim(char *value)
     return value;
 }
 
+/* 解析布尔配置项，支持 true/false、yes/no、on/off 和 1/0。 */
 static int parse_bool(const char *value, int *out)
 {
     if (strcasecmp(value, "true") == 0 || strcasecmp(value, "yes") == 0 || strcmp(value, "1") == 0 ||
@@ -44,6 +46,7 @@ static int parse_bool(const char *value, int *out)
     return -1;
 }
 
+/* 解析指定范围内的整数配置项，越界或格式错误时返回失败。 */
 static int parse_int_range(const char *value, int min_value, int max_value, int *out)
 {
     char *end = NULL;
@@ -59,6 +62,7 @@ static int parse_int_range(const char *value, int min_value, int max_value, int 
     return 0;
 }
 
+/* 解析不小于指定最小值的浮点配置项。 */
 static int parse_double_min(const char *value, double min_value, double *out)
 {
     char *end = NULL;
@@ -74,6 +78,7 @@ static int parse_double_min(const char *value, double min_value, double *out)
     return 0;
 }
 
+/* 解析三级调试打印等级：off、info、detail。 */
 static int parse_debug_level(const char *value, app_debug_level_t *out)
 {
     if (strcasecmp(value, "off") == 0 || strcasecmp(value, "none") == 0 ||
@@ -97,11 +102,13 @@ static int parse_debug_level(const char *value, app_debug_level_t *out)
     return -1;
 }
 
+/* 安全设置字符串配置项，避免目标缓冲区溢出。 */
 static void set_string(char *dest, size_t dest_size, const char *value)
 {
     snprintf(dest, dest_size, "%s", value);
 }
 
+/* 设置程序默认配置，配置文件中未出现的字段使用这些默认值。 */
 void config_set_defaults(app_config_t *config)
 {
     memset(config, 0, sizeof(*config));
@@ -112,6 +119,9 @@ void config_set_defaults(app_config_t *config)
     config->debug_level = APP_DEBUG_INFO;
     set_string(config->pid_file, sizeof(config->pid_file), "/run/iec104-master/iec104-master.pid");
     set_string(config->log_file, sizeof(config->log_file), "/var/log/iec104-master/iec104-master.log");
+    set_string(config->debug_log_file,
+               sizeof(config->debug_log_file),
+               "/var/log/iec104-master/debug/iec104-master-debug.log");
     config->connect_timeout_sec = 5;
     config->receive_timeout_sec = 2;
     config->reconnect_initial_sec = 2;
@@ -126,6 +136,7 @@ void config_set_defaults(app_config_t *config)
     config->log_unchanged_yx = 0;
 }
 
+/* 加载并解析主站配置文件，将 key=value 配置写入 app_config_t。 */
 int config_load(app_config_t *config, const char *path)
 {
     FILE *fp;
@@ -192,6 +203,8 @@ int config_load(app_config_t *config, const char *path)
             set_string(config->pid_file, sizeof(config->pid_file), value);
         } else if (strcmp(key, "log_file") == 0) {
             set_string(config->log_file, sizeof(config->log_file), value);
+        } else if (strcmp(key, "debug_log_file") == 0) {
+            set_string(config->debug_log_file, sizeof(config->debug_log_file), value);
         } else if (strcmp(key, "connect_timeout_sec") == 0) {
             if (parse_int_range(value, 1, 300, &config->connect_timeout_sec) != 0) {
                 goto invalid_value;
@@ -263,6 +276,7 @@ int config_load(app_config_t *config, const char *path)
     return 0;
 }
 
+/* 打印命令行使用说明，供参数错误或 -h 时调用。 */
 void config_print_usage(const char *program)
 {
     fprintf(stderr,

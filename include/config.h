@@ -22,6 +22,7 @@ typedef struct app_config {
     app_debug_level_t debug_level;
     char pid_file[IEC104_PATH_MAX];
     char log_file[IEC104_PATH_MAX];
+    char debug_log_file[IEC104_PATH_MAX];
 
     int connect_timeout_sec;
     int receive_timeout_sec;
@@ -39,8 +40,13 @@ typedef struct app_config {
     int log_unchanged_yx;
 } app_config_t;
 
+/* 设置默认配置参数。 */
 void config_set_defaults(app_config_t *config);
+
+/* 从指定配置文件加载参数。 */
 int config_load(app_config_t *config, const char *path);
+
+/* 打印命令行使用说明。 */
 void config_print_usage(const char *program);
 
 #endif

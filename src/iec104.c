@@ -65,21 +65,25 @@ typedef struct iec104_session {
     struct timeval last_data_ack;
 } iec104_session_t;
 
+/* 从小端字节序读取 16 位无符号整数。 */
 static uint16_t read_le16(const uint8_t *buffer)
 {
     return (uint16_t)(buffer[0] | ((uint16_t)buffer[1] << 8));
 }
 
+/* 从小端字节序读取 24 位无符号整数，IEC104 信息体地址使用该格式。 */
 static uint32_t read_le24(const uint8_t *buffer)
 {
     return (uint32_t)buffer[0] | ((uint32_t)buffer[1] << 8) | ((uint32_t)buffer[2] << 16);
 }
 
+/* 从小端字节序读取 16 位有符号整数。 */
 static int16_t read_i16(const uint8_t *buffer)
 {
     return (int16_t)read_le16(buffer);
 }
 
+/* 从小端字节序读取 32 位有符号整数，用于电能累计量。 */
 static int32_t read_i32(const uint8_t *buffer)
 {
     uint32_t value = (uint32_t)buffer[0] | ((uint32_t)buffer[1] << 8) | ((uint32_t)buffer[2] << 16) |
@@ -87,6 +91,7 @@ static int32_t read_i32(const uint8_t *buffer)
     return (int32_t)value;
 }
 
+/* 从小端字节序读取 IEEE754 单精度浮点数，用于短浮点遥测。 */
 static float read_float32(const uint8_t *buffer)
 {
     uint32_t raw = (uint32_t)buffer[0] | ((uint32_t)buffer[1] << 8) | ((uint32_t)buffer[2] << 16) |
@@ -97,11 +102,13 @@ static float read_float32(const uint8_t *buffer)
     return value;
 }
 
+/* 计算两个 timeval 之间经过的毫秒数。 */
 static long elapsed_ms(const struct timeval *start, const struct timeval *end)
 {
     return (long)((end->tv_sec - start->tv_sec) * 1000L + (end->tv_usec - start->tv_usec) / 1000L);
 }
 
+/* 将 socket 设置为非阻塞模式，用于实现连接超时。 */
 static int set_nonblocking(int fd)
 {
     int flags = fcntl(fd, F_GETFL, 0);
@@ -111,6 +118,7 @@ static int set_nonblocking(int fd)
     return fcntl(fd, F_SETFL, flags | O_NONBLOCK);
 }
 
+/* 将 socket 恢复为阻塞模式，便于后续按帧读写。 */
 static int set_blocking(int fd)
 {
     int flags = fcntl(fd, F_GETFL, 0);
@@ -120,6 +128,7 @@ static int set_blocking(int fd)
     return fcntl(fd, F_SETFL, flags & ~O_NONBLOCK);
 }
 
+/* 在指定超时时间内连接 IEC104 从站，并设置 TCP keepalive 和收发超时。 */
 static int connect_with_timeout(const char *host, uint16_t port, int timeout_sec)
 {
     struct addrinfo hints;
@@ -200,6 +209,7 @@ static int connect_with_timeout(const char *host, uint16_t port, int timeout_sec
     return fd;
 }
 
+/* 循环发送缓冲区全部内容，避免短写导致 IEC104 帧不完整。 */
 static int write_all(int fd, const uint8_t *buffer, size_t length)
 {
     size_t sent = 0;
@@ -221,6 +231,7 @@ static int write_all(int fd, const uint8_t *buffer, size_t length)
     return 0;
 }
 
+/* 发送 IEC104 U 帧，用于 STARTDT、STOPDT 和 TESTFR 控制。 */
 static int send_u_frame(iec104_session_t *session, uint8_t control)
 {
     uint8_t frame[6] = {IEC104_START, 4, control, 0, 0, 0};
@@ -234,6 +245,7 @@ static int send_u_frame(iec104_session_t *session, uint8_t control)
     return 0;
 }
 
+/* 发送 IEC104 S 帧，确认已经接收的从站 I 帧序号。 */
 static int send_s_frame(iec104_session_t *session)
 {
     uint8_t frame[6];
@@ -257,6 +269,7 @@ static int send_s_frame(iec104_session_t *session)
     return 0;
 }
 
+/* 发送 IEC104 I 帧，携带主站 ASDU，例如总召命令。 */
 static int send_i_frame(iec104_session_t *session, const uint8_t *asdu, size_t asdu_len)
 {
     uint8_t frame[IEC104_MAX_APDU];
@@ -310,6 +323,7 @@ static int send_general_interrogation(iec104_session_t *session, uint16_t common
     return 0;
 }
 
+/* 从 socket 读取指定长度数据，遇到断线或超时返回对应状态。 */
 static int receive_exact(int fd, uint8_t *buffer, size_t length)
 {
     size_t received = 0;
@@ -334,6 +348,7 @@ static int receive_exact(int fd, uint8_t *buffer, size_t length)
     return 0;
 }
 
+/* 等待并读取一帧完整 IEC104 APDU，校验启动字符和长度字段。 */
 static int wait_and_read_frame(int fd, uint8_t *frame, size_t *frame_len, int timeout_sec, volatile sig_atomic_t *running)
 {
     fd_set readfds;
@@ -379,6 +394,7 @@ static int wait_and_read_frame(int fd, uint8_t *frame, size_t *frame_len, int ti
     return 0;
 }
 
+/* 解析 CP56Time2a 七字节时标，转换为可读时间字符串。 */
 static int parse_cp56time2a(const uint8_t *data, char *buffer, size_t buffer_size)
 {
     unsigned int milliseconds = (unsigned int)data[0] | ((unsigned int)data[1] << 8);
@@ -405,6 +421,7 @@ static int parse_cp56time2a(const uint8_t *data, char *buffer, size_t buffer_siz
     return 0;
 }
 
+/* 判断类型标识是否带 CP56Time2a 时标，并返回时标长度。 */
 static size_t type_time_size(uint8_t type_id)
 {
     switch (type_id) {
@@ -420,6 +437,7 @@ static size_t type_time_size(uint8_t type_id)
     }
 }
 
+/* 根据 ASDU 类型标识返回单个信息体数据区长度，不包含 3 字节 IOA。 */
 static size_t information_object_size(uint8_t type_id)
 {
     switch (type_id) {
@@ -446,6 +464,7 @@ static size_t information_object_size(uint8_t type_id)
     }
 }
 
+/* 如果信息体包含时标，则解析并输出详细调试日志。 */
 static void log_object_time(uint8_t type_id, const uint8_t *time_data)
 {
     char time_buf[64];
@@ -459,6 +478,7 @@ static void log_object_time(uint8_t type_id, const uint8_t *time_data)
     }
 }
 
+/* 解析单个信息体对象，并按类型更新遥信、遥测或电能累计量点表。 */
 static void parse_information_object(uint8_t type_id,
                                      uint16_t common_address,
                                      uint32_t ioa,
@@ -633,6 +653,7 @@ static void parse_asdu(const uint8_t *asdu, size_t len, const app_config_t *conf
     }
 }
 
+/* 处理一帧 IEC104 APDU，根据 I/S/U 帧类型维护序号、确认和链路状态。 */
 static int handle_frame(iec104_session_t *session,
                         const uint8_t *frame,
                         size_t frame_len,
@@ -705,6 +726,7 @@ static int handle_frame(iec104_session_t *session,
     return 0;
 }
 
+/* 单次连接会话主循环：连接从站、启动数据传输、总召、保活并接收数据。 */
 static int session_loop(iec104_session_t *session,
                         const app_config_t *config,
                         point_store_t *store,
@@ -805,6 +827,7 @@ static int session_loop(iec104_session_t *session,
     return 0;
 }
 
+/* IEC104 主站外层运行循环，负责断线后的指数退避重连。 */
 int iec104_master_run(const app_config_t *config, point_store_t *store, volatile sig_atomic_t *running)
 {
     int reconnect_delay = config->reconnect_initial_sec;

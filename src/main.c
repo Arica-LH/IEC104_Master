@@ -14,12 +14,14 @@
 
 static volatile sig_atomic_t g_running = 1;
 
+/* 捕获退出信号，通知主循环停止并进行资源清理。 */
 static void handle_signal(int signo)
 {
     (void)signo;
     g_running = 0;
 }
 
+/* 安装 SIGINT/SIGTERM 处理函数，并忽略 SIGPIPE 防止网络断开导致进程退出。 */
 static int install_signal_handlers(void)
 {
     struct sigaction action;
@@ -36,6 +38,7 @@ static int install_signal_handlers(void)
     return 0;
 }
 
+/* 程序入口：加载配置、初始化日志和点表，然后启动 IEC104 主站采集循环。 */
 int main(int argc, char **argv)
 {
     app_config_t config;
@@ -100,7 +103,7 @@ int main(int argc, char **argv)
         return EXIT_FAILURE;
     }
 
-    if (log_init(config.log_file, config.daemonize, config.debug_level) != 0) {
+    if (log_init(config.log_file, config.debug_log_file, config.daemonize, config.debug_level) != 0) {
         process_pidfile_release();
         return EXIT_FAILURE;
     }

@@ -30,6 +30,7 @@ struct point_store {
     point_entry_t *buckets[1024];
 };
 
+/* 根据点类型、公共地址和信息体地址计算哈希桶位置。 */
 static unsigned int point_hash(point_type_t type, uint16_t common_address, uint32_t ioa)
 {
     uint32_t value = ((uint32_t)type * 2654435761u) ^ ((uint32_t)common_address << 16) ^ ioa;
@@ -37,6 +38,7 @@ static unsigned int point_hash(point_type_t type, uint16_t common_address, uint3
     return value % 1024u;
 }
 
+/* 查找指定点表项；不存在时创建新点，用于保存上一次值和质量码。 */
 static point_entry_t *get_or_create(point_store_t *store,
                                     point_type_t type,
                                     uint16_t common_address,
@@ -66,11 +68,13 @@ static point_entry_t *get_or_create(point_store_t *store,
     return entry;
 }
 
+/* 创建点表缓存，用于记录遥信、遥测和电能累计量的最新状态。 */
 point_store_t *point_store_create(void)
 {
     return calloc(1, sizeof(point_store_t));
 }
 
+/* 销毁点表缓存并释放所有动态分配的点表项。 */
 void point_store_destroy(point_store_t *store)
 {
     if (store == NULL) {
@@ -89,6 +93,7 @@ void point_store_destroy(point_store_t *store)
     free(store);
 }
 
+/* 更新遥信点状态，状态或质量码变化时输出日志。 */
 void point_store_update_yx(point_store_t *store,
                            uint16_t common_address,
                            uint32_t ioa,
@@ -125,6 +130,7 @@ void point_store_update_yx(point_store_t *store,
     entry->updated_at = time(NULL);
 }
 
+/* 更新遥测点状态，数值或质量码变化时输出日志。 */
 void point_store_update_yc(point_store_t *store,
                            uint16_t common_address,
                            uint32_t ioa,
@@ -161,6 +167,7 @@ void point_store_update_yc(point_store_t *store,
     entry->updated_at = time(NULL);
 }
 
+/* 更新电能累计量，并按绝对阈值和倍率阈值识别突发异常值。 */
 void point_store_update_energy(point_store_t *store,
                                uint16_t common_address,
                                uint32_t ioa,
