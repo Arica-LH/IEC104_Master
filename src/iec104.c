@@ -128,82 +128,122 @@ static int set_blocking(int fd)
     return fcntl(fd, F_SETFL, flags & ~O_NONBLOCK);
 }
 
-/* 在指定超时时间内连接 IEC104 从站，并设置 TCP keepalive 和收发超时。 */
-static int connect_with_timeout(const char *host, uint16_t port, int timeout_sec)
+/* 对指定 socket 地址执行带超时的 TCP 连接。 */
+static int connect_sockaddr_with_timeout(const struct sockaddr *address,
+                                         socklen_t address_len,
+                                         int family,
+                                         int timeout_sec)
 {
-    struct addrinfo hints;
-    struct addrinfo *result = NULL;
-    struct addrinfo *rp;
-    char service[16];
     int fd = -1;
     int rc;
+    int opt = 1;
+    struct pollfd pfd;
+    int error = 0;
+    socklen_t error_len = sizeof(error);
 
-    memset(&hints, 0, sizeof(hints));
-    hints.ai_family = AF_UNSPEC;
-    hints.ai_socktype = SOCK_STREAM;
-    hints.ai_protocol = IPPROTO_TCP;
-    snprintf(service, sizeof(service), "%u", port);
-
-    rc = getaddrinfo(host, service, &hints, &result);
-    if (rc != 0) {
-        log_write(LOG_LEVEL_ERROR, "resolve slave %s:%u failed: %s", host, port, gai_strerror(rc));
+    fd = socket(family, SOCK_STREAM, IPPROTO_TCP);
+    if (fd < 0) {
         return -1;
     }
 
-    for (rp = result; rp != NULL; rp = rp->ai_next) {
-        int opt = 1;
-        struct pollfd pfd;
-        int error = 0;
-        socklen_t error_len = sizeof(error);
+    setsockopt(fd, SOL_SOCKET, SO_KEEPALIVE, &opt, sizeof(opt));
 
-        fd = socket(rp->ai_family, rp->ai_socktype, rp->ai_protocol);
-        if (fd < 0) {
-            continue;
-        }
-
-        setsockopt(fd, SOL_SOCKET, SO_KEEPALIVE, &opt, sizeof(opt));
-
-        if (set_nonblocking(fd) != 0) {
-            close(fd);
-            fd = -1;
-            continue;
-        }
-
-        rc = connect(fd, rp->ai_addr, rp->ai_addrlen);
-        if (rc == 0) {
-            set_blocking(fd);
-            break;
-        }
-
-        if (errno != EINPROGRESS) {
-            close(fd);
-            fd = -1;
-            continue;
-        }
-
-        pfd.fd = fd;
-        pfd.events = POLLOUT;
-        pfd.revents = 0;
-        rc = poll(&pfd, 1, timeout_sec * 1000);
-        if (rc > 0 && (pfd.revents & POLLOUT) != 0 &&
-            getsockopt(fd, SOL_SOCKET, SO_ERROR, &error, &error_len) == 0 && error == 0) {
-            set_blocking(fd);
-            break;
-        }
-
+    if (set_nonblocking(fd) != 0) {
         close(fd);
-        fd = -1;
+        return -1;
     }
 
-    freeaddrinfo(result);
+    rc = connect(fd, address, address_len);
+    if (rc == 0) {
+        set_blocking(fd);
+        return fd;
+    }
 
-    if (fd >= 0) {
-        struct timeval timeout;
+    if (errno != EINPROGRESS) {
+        close(fd);
+        return -1;
+    }
 
-        timeout.tv_sec = timeout_sec;
-        timeout.tv_usec = 0;
-        setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
-        setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, &timeout, sizeof(timeout));
+    pfd.fd = fd;
+    pfd.events = POLLOUT;
+    pfd.revents = 0;
+    rc = poll(&pfd, 1, timeout_sec * 1000);
+    if (rc > 0 && (pfd.revents & POLLOUT) != 0 &&
+        getsockopt(fd, SOL_SOCKET, SO_ERROR, &error, &error_len) == 0 && error == 0) {
+        set_blocking(fd);
+        return fd;
+    }
+
+    close(fd);
+    return -1;
+}
+
+/* 设置连接成功后的 socket 收发超时。 */
+static void set_socket_timeouts(int fd, int timeout_sec)
+{
+    struct timeval timeout;
+
+    timeout.tv_sec = timeout_sec;
+    timeout.tv_usec = 0;
+    setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
+    setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, &timeout, sizeof(timeout));
+}
+
+/* 在指定超时时间内连接 IEC104 从站，并设置 TCP keepalive 和收发超时。 */
+static int connect_with_timeout(const char *host, uint16_t port, int timeout_sec)
+{
+    struct sockaddr_in ipv4_address;
+    struct sockaddr_in6 ipv6_address;
+    int fd = -1;
+
+    memset(&ipv4_address, 0, sizeof(ipv4_address));
+    ipv4_address.sin_family = AF_INET;
+    ipv4_address.sin_port = htons(port);
+    if (inet_pton(AF_INET, host, &ipv4_address.sin_addr) == 1) {
+        fd = connect_sockaddr_with_timeout((struct sockaddr *)&ipv4_address,
+                                           sizeof(ipv4_address),
+                                           AF_INET,
+                                           timeout_sec);
+        if (fd >= 0) {
+            set_socket_timeouts(fd, timeout_sec);
+        }
+        return fd;
+    }
+
+    memset(&ipv6_address, 0, sizeof(ipv6_address));
+    ipv6_address.sin6_family = AF_INET6;
+    ipv6_address.sin6_port = htons(port);
+    if (inet_pton(AF_INET6, host, &ipv6_address.sin6_addr) == 1) {
+        fd = connect_sockaddr_with_timeout((struct sockaddr *)&ipv6_address,
+                                           sizeof(ipv6_address),
+                                           AF_INET6,
+                                           timeout_sec);
+        if (fd >= 0) {
+            set_socket_timeouts(fd, timeout_sec);
+        }
+        return fd;
+    }
+
+    struct hostent *host_entry = gethostbyname(host);
+    if (host_entry == NULL || host_entry->h_addrtype != AF_INET || host_entry->h_addr_list == NULL) {
+        log_write(LOG_LEVEL_ERROR, "resolve slave %s:%u failed", host, port);
+        return -1;
+    }
+
+    for (char **address = host_entry->h_addr_list; *address != NULL; ++address) {
+        memset(&ipv4_address, 0, sizeof(ipv4_address));
+        ipv4_address.sin_family = AF_INET;
+        ipv4_address.sin_port = htons(port);
+        memcpy(&ipv4_address.sin_addr, *address, sizeof(ipv4_address.sin_addr));
+
+        fd = connect_sockaddr_with_timeout((struct sockaddr *)&ipv4_address,
+                                           sizeof(ipv4_address),
+                                           AF_INET,
+                                           timeout_sec);
+        if (fd >= 0) {
+            set_socket_timeouts(fd, timeout_sec);
+            break;
+        }
     }
 
     return fd;
