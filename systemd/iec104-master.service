@@ -1,0 +1,25 @@
+[Unit]
+Description=IEC104 Master Data Collector
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/sbin/iec104-master -c /etc/iec104-master/iec104_master.conf -f
+Restart=always
+RestartSec=5
+StartLimitIntervalSec=0
+User=iec104
+Group=iec104
+RuntimeDirectory=iec104-master
+RuntimeDirectoryMode=0755
+LogsDirectory=iec104-master
+LogsDirectoryMode=0755
+LimitNOFILE=65535
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+
+[Install]
+WantedBy=multi-user.target
