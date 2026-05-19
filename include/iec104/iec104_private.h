@@ -10,10 +10,6 @@
 #include <sys/time.h>
 #include <time.h>
 
-#ifndef MSG_NOSIGNAL
-#define MSG_NOSIGNAL 0
-#endif
-
 #define IEC104_START 0x68
 #define IEC104_MAX_APDU 255
 #define IEC104_APCI_LEN 6

@@ -13,6 +13,10 @@
 #include <sys/socket.h>
 #include <unistd.h>
 
+#ifndef MSG_NOSIGNAL
+#define MSG_NOSIGNAL 0
+#endif
+
 /* 将 socket 设置为非阻塞模式，用于实现连接超时。 */
 static int set_nonblocking(int fd)
 {
