@@ -7,6 +7,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+/* 设置单个网关的默认参数，未配置字段会继承这些默认值。 */
 void config_gateway_set_defaults(gateway_config_t *gateway, size_t index)
 {
     memset(gateway, 0, sizeof(*gateway));
@@ -17,12 +18,14 @@ void config_gateway_set_defaults(gateway_config_t *gateway, size_t index)
     gateway->enabled = 1;
 }
 
+/* 清空网关数组，用于从旧单网关格式切换到 gateway.N.* 新格式。 */
 void config_gateway_clear_all(app_config_t *config)
 {
     memset(config->gateways, 0, sizeof(config->gateways));
     config->gateway_count = 0;
 }
 
+/* 获取指定序号的网关配置；如果首次出现该序号，则先写入默认值。 */
 gateway_config_t *config_gateway_ensure(app_config_t *config, size_t index)
 {
     gateway_config_t *gateway;
@@ -44,6 +47,7 @@ gateway_config_t *config_gateway_ensure(app_config_t *config, size_t index)
     return gateway;
 }
 
+/* 解析 gateway.N.field 配置键，拆出从 0 开始的网关下标和字段名。 */
 int config_gateway_parse_key(const char *key, size_t *index, const char **field)
 {
     const char prefix[] = "gateway.";
@@ -67,6 +71,7 @@ int config_gateway_parse_key(const char *key, size_t *index, const char **field)
     return 0;
 }
 
+/* 解析单个网关字段，并写入对应 gateway_config_t。 */
 int config_gateway_parse_field(gateway_config_t *gateway, const char *field, const char *value)
 {
     if (strcmp(field, "name") == 0) {
@@ -102,6 +107,7 @@ int config_gateway_parse_field(gateway_config_t *gateway, const char *field, con
     return 0;
 }
 
+/* 压缩启用的网关配置，校验必填项和名称唯一性。 */
 int config_gateway_finalize(app_config_t *config, const char *path)
 {
     size_t write_index = 0;

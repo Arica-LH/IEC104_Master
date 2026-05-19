@@ -35,6 +35,7 @@ void config_set_defaults(app_config_t *config)
     config->log_unchanged_yx = 0;
 }
 
+/* 解析全局配置项，例如日志路径、重连参数、总召周期和调试等级。 */
 static int parse_global_key(app_config_t *config, const char *key, const char *value)
 {
     if (strcmp(key, "daemonize") == 0) {
@@ -103,6 +104,7 @@ static int parse_global_key(app_config_t *config, const char *key, const char *v
     return 1;
 }
 
+/* 解析旧版 slave_host/slave_port/common_address 单网关配置，保持向后兼容。 */
 static int parse_legacy_gateway_key(app_config_t *config, const char *key, const char *value)
 {
     if (strcmp(key, "slave_host") == 0) {

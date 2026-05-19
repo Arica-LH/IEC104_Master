@@ -6,6 +6,7 @@
 
 #include <string.h>
 
+/* 发送 U 帧控制报文，例如 STARTDT、STOPDT 和 TESTFR。 */
 int iec104_send_u_frame(iec104_session_t *session, uint8_t control)
 {
     uint8_t frame[6] = {IEC104_START, 4, control, 0, 0, 0};
@@ -19,6 +20,7 @@ int iec104_send_u_frame(iec104_session_t *session, uint8_t control)
     return 0;
 }
 
+/* 发送 S 帧确认，告知网关主站已经接收的 I 帧序号。 */
 int iec104_send_s_frame(iec104_session_t *session)
 {
     uint8_t frame[6];
@@ -76,6 +78,7 @@ static int send_i_frame(iec104_session_t *session, const uint8_t *asdu, size_t a
     return 0;
 }
 
+/* 发送总召命令，请求指定公共地址下的当前遥信、遥测和电能量数据。 */
 int iec104_send_general_interrogation(iec104_session_t *session, uint16_t common_address)
 {
     uint8_t asdu[10];
@@ -100,6 +103,7 @@ int iec104_send_general_interrogation(iec104_session_t *session, uint16_t common
     return 0;
 }
 
+/* 处理收到的 I/S/U 帧，维护链路序号并把 ASDU 交给解析模块。 */
 int iec104_handle_frame(iec104_session_t *session,
                         const uint8_t *frame,
                         size_t frame_len,

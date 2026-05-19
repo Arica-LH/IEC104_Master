@@ -94,6 +94,7 @@ static void set_socket_timeouts(int fd, int timeout_sec)
     setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, &timeout, sizeof(timeout));
 }
 
+/* 按网关配置建立 TCP 连接，支持 IPv4、IPv6 和域名解析。 */
 int iec104_connect_with_timeout(const gateway_config_t *gateway, int timeout_sec)
 {
     struct sockaddr_in ipv4_address;
@@ -170,6 +171,7 @@ int iec104_connect_with_timeout(const gateway_config_t *gateway, int timeout_sec
     return fd;
 }
 
+/* 确保完整写出一帧数据，处理 send 短写和 EINTR 中断。 */
 int iec104_write_all(int fd, const uint8_t *buffer, size_t length)
 {
     size_t sent = 0;
@@ -216,6 +218,7 @@ static int receive_exact(int fd, uint8_t *buffer, size_t length)
     return 0;
 }
 
+/* 等待 socket 可读并读取完整 APDU，返回 1 表示本轮超时但连接仍可继续。 */
 int iec104_wait_and_read_frame(const gateway_config_t *gateway,
                                int fd,
                                uint8_t *frame,

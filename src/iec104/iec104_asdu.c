@@ -183,6 +183,7 @@ static void parse_information_object(uint8_t type_id,
     }
 }
 
+/* 解析 ASDU 头、VSQ 和信息体列表，并按类型分发到点表缓存。 */
 void iec104_parse_asdu(const uint8_t *asdu,
                        size_t len,
                        const app_config_t *config,

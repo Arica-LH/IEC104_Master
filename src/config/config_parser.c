@@ -7,6 +7,7 @@
 #include <string.h>
 #include <strings.h>
 
+/* 去除配置行 key/value 两端空白，返回可直接使用的字符串起始位置。 */
 char *config_trim(char *value)
 {
     char *end;
@@ -28,6 +29,7 @@ char *config_trim(char *value)
     return value;
 }
 
+/* 解析布尔配置值，支持现场配置常见的 true/false、yes/no、on/off 和 1/0。 */
 int config_parse_bool(const char *value, int *out)
 {
     if (strcasecmp(value, "true") == 0 || strcasecmp(value, "yes") == 0 || strcmp(value, "1") == 0 ||
@@ -44,6 +46,7 @@ int config_parse_bool(const char *value, int *out)
     return -1;
 }
 
+/* 解析整数并检查取值范围，避免非法配置进入运行逻辑。 */
 int config_parse_int_range(const char *value, int min_value, int max_value, int *out)
 {
     char *end = NULL;
@@ -59,6 +62,7 @@ int config_parse_int_range(const char *value, int min_value, int max_value, int 
     return 0;
 }
 
+/* 解析浮点数并检查下限，主要用于阈值和倍率类配置项。 */
 int config_parse_double_min(const char *value, double min_value, double *out)
 {
     char *end = NULL;
@@ -74,6 +78,7 @@ int config_parse_double_min(const char *value, double min_value, double *out)
     return 0;
 }
 
+/* 将配置文件中的调试等级文本转换为内部枚举。 */
 int config_parse_debug_level(const char *value, app_debug_level_t *out)
 {
     if (strcasecmp(value, "off") == 0 || strcasecmp(value, "none") == 0 ||
@@ -97,6 +102,7 @@ int config_parse_debug_level(const char *value, app_debug_level_t *out)
     return -1;
 }
 
+/* 统一使用有界拷贝写入字符串配置，防止目标缓冲区溢出。 */
 void config_set_string(char *dest, size_t dest_size, const char *value)
 {
     snprintf(dest, dest_size, "%s", value);
