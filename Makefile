@@ -5,15 +5,15 @@ SYSTEMDDIR ?= /etc/systemd/system
 
 TARGET := iec104-master
 BUILD_DIR := build
-SRC := $(wildcard src/*.c)
+SRC := $(shell find src -name '*.c' -type f | sort)
 OBJ := $(patsubst src/%.c,$(BUILD_DIR)/%.o,$(SRC))
 DEP := $(OBJ:.o=.d)
 
 CPPFLAGS ?=
 CFLAGS ?= -O2 -g
-CFLAGS += -std=c11 -Wall -Wextra -Wpedantic -Werror -D_POSIX_C_SOURCE=200809L -Iinclude
+CFLAGS += -std=c11 -Wall -Wextra -Wpedantic -Werror -D_POSIX_C_SOURCE=200809L -pthread -Iinclude
 LDFLAGS ?=
-LDLIBS ?= -lm
+LDLIBS ?= -lm -pthread
 
 .PHONY: all clean install uninstall
 
@@ -23,6 +23,7 @@ $(TARGET): $(OBJ)
 	$(CC) $(LDFLAGS) -o $@ $^ $(LDLIBS)
 
 $(BUILD_DIR)/%.o: src/%.c | $(BUILD_DIR)
+	mkdir -p $(dir $@)
 	$(CC) $(CPPFLAGS) $(CFLAGS) -MMD -MP -c -o $@ $<
 
 $(BUILD_DIR):

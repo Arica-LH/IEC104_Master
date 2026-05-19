@@ -4,7 +4,7 @@ Linux 下的 IEC 60870-5-104 主站采集程序，使用 C 语言实现，无第
 
 ## 功能范围
 
-- 主站主动连接 IEC104 从站 TCP `2404` 端口。
+- 主站主动连接一个或多个 IEC104 网关 TCP `2404` 端口。
 - 支持 `STARTDT`、`STOPDT`、`TESTFR`、I/S/U 帧、接收序号确认和断线重连。
 - 支持总召 `C_IC_NA_1`，按配置周期重新总召，适合长时间连续运行。
 - 支持遥信解析：`M_SP_NA_1`、`M_DP_NA_1`、`M_SP_TB_1`、`M_DP_TB_1`。
@@ -37,9 +37,11 @@ cp config/iec104_master.conf /tmp/iec104_master.conf
 修改 `/tmp/iec104_master.conf`：
 
 ```conf
-slave_host = 192.168.1.10
-slave_port = 2404
-common_address = 1
+gateway.1.name = gateway1
+gateway.1.host = 192.168.1.10
+gateway.1.port = 2404
+gateway.1.common_address = 1
+gateway.1.enabled = true
 pid_file = /tmp/iec104-master.pid
 log_file = /tmp/iec104-master.log
 debug_log_file = /tmp/iec104-master/debug/iec104-master-debug.log
@@ -56,9 +58,11 @@ debug_level = detail
 
 默认配置文件在 [config/iec104_master.conf](config/iec104_master.conf)。
 
-- `slave_host`：从站 IP 或域名。
-- `slave_port`：从站 IEC104 端口，默认 `2404`。
-- `common_address`：公共地址，通常由现场规约表确定。
+- `gateway.N.name`：网关名称，用于日志标识，最多支持 `32` 个网关。
+- `gateway.N.host`：网关 IP 或域名，也兼容写作 `gateway.N.slave_host`。
+- `gateway.N.port`：网关 IEC104 端口，默认 `2404`，也兼容写作 `gateway.N.slave_port`。
+- `gateway.N.common_address`：公共地址，通常由现场规约表确定，也兼容写作 `gateway.N.ca`。
+- `gateway.N.enabled`：是否启用该网关，默认启用。
 - `debug_level`：打印等级，`off` 只输出告警和错误，`info` 输出大致运行信息，`detail` 输出详细调试信息。
 - `log_file`：普通日志文件，记录 `INFO/WARN/ERROR`。
 - `debug_log_file`：详细调试日志文件，记录 `DEBUG`，建议放在独立 `debug` 日志目录；程序会自动创建父目录。
@@ -70,12 +74,29 @@ debug_level = detail
 - `log_all_yc`：是否记录未变化遥测。
 - `log_unchanged_yx`：是否记录未变化遥信。
 
+多网关示例：
+
+```conf
+gateway.1.name = main-gateway
+gateway.1.host = 192.168.1.10
+gateway.1.port = 2404
+gateway.1.common_address = 1
+
+gateway.2.name = backup-gateway
+gateway.2.host = 192.168.1.11
+gateway.2.port = 2404
+gateway.2.common_address = 1
+gateway.2.enabled = true
+```
+
+旧配置项 `slave_host`、`slave_port`、`common_address` 仍兼容，会作为单网关配置处理；不要和 `gateway.N.*` 混用。
+
 命令行参数 `-v` 会临时覆盖配置文件，把 `debug_level` 设置为 `detail`，便于现场排查。
 
 突发电量日志示例：
 
 ```text
-2026-05-18 15:00:00.123 [WARN] ENERGY_SPIKE ca=1 ioa=1001 previous=1200.000 current=8500.000 delta=7300.000 flags=0x00 threshold_abs=1000.000 threshold_rate=5.000
+2026-05-18 15:00:00.123 [WARN] [gateway1] ENERGY_SPIKE ca=1 ioa=1001 previous=1200.000 current=8500.000 delta=7300.000 flags=0x00 threshold_abs=1000.000 threshold_rate=5.000
 ```
 
 ## systemd 部署
@@ -125,8 +146,19 @@ tail -f /var/log/iec104-master/debug/iec104-master-debug.log
 ## 代码结构
 
 - [src/main.c](src/main.c)：程序入口、参数解析、信号处理。
-- [src/iec104.c](src/iec104.c)：IEC104 连接、帧处理、总召、保活和重连。
-- [src/point_store.c](src/point_store.c)：遥信、遥测、电能累计量状态缓存和突发值识别。
-- [src/config.c](src/config.c)：配置文件解析。
-- [src/logging.c](src/logging.c)：日志输出。
-- [src/process.c](src/process.c)：daemon 化和 PID 文件锁。
+- [src/iec104/iec104.c](src/iec104/iec104.c)：IEC104 多网关线程调度、会话循环、总召、保活和重连。
+- [src/iec104/iec104_io.c](src/iec104/iec104_io.c)：TCP 连接、socket 超时、IEC104 APDU 读写。
+- [src/iec104/iec104_frame.c](src/iec104/iec104_frame.c)：IEC104 I/S/U 帧发送和帧状态处理。
+- [src/iec104/iec104_asdu.c](src/iec104/iec104_asdu.c)：ASDU 解析，遥信、遥测、电能累计量分发。
+- [src/iec104/iec104_util.c](src/iec104/iec104_util.c)：IEC104 字节序读取和时间辅助函数。
+- [include/iec104](include/iec104)：IEC104 模块头文件。
+- [src/point_store/point_store.c](src/point_store/point_store.c)：遥信、遥测、电能累计量状态缓存和突发值识别。
+- [include/point_store](include/point_store)：点表缓存模块头文件。
+- [src/config/config.c](src/config/config.c)：配置文件加载和配置项分发。
+- [src/config/config_parser.c](src/config/config_parser.c)：配置值解析工具。
+- [src/config/config_gateway.c](src/config/config_gateway.c)：多网关配置解析和校验。
+- [include/config](include/config)：配置模块头文件。
+- [src/logging/logging.c](src/logging/logging.c)：日志输出。
+- [include/logging](include/logging)：日志模块头文件。
+- [src/process/process.c](src/process/process.c)：daemon 化和 PID 文件锁。
+- [include/process](include/process)：进程模块头文件。

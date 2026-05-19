@@ -1,10 +1,19 @@
 #ifndef IEC104_MASTER_CONFIG_H
 #define IEC104_MASTER_CONFIG_H
 
+#include <stddef.h>
 #include <stdint.h>
 
 #ifndef IEC104_PATH_MAX
 #define IEC104_PATH_MAX 4096
+#endif
+
+#ifndef IEC104_GATEWAY_MAX
+#define IEC104_GATEWAY_MAX 32
+#endif
+
+#ifndef IEC104_GATEWAY_NAME_MAX
+#define IEC104_GATEWAY_NAME_MAX 64
 #endif
 
 typedef enum app_debug_level {
@@ -13,10 +22,18 @@ typedef enum app_debug_level {
     APP_DEBUG_DETAIL = 2
 } app_debug_level_t;
 
-typedef struct app_config {
+typedef struct gateway_config {
+    char name[IEC104_GATEWAY_NAME_MAX];
     char slave_host[256];
     uint16_t slave_port;
     uint16_t common_address;
+    int enabled;
+    int configured;
+} gateway_config_t;
+
+typedef struct app_config {
+    gateway_config_t gateways[IEC104_GATEWAY_MAX];
+    size_t gateway_count;
 
     int daemonize;
     app_debug_level_t debug_level;

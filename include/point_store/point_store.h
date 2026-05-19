@@ -13,6 +13,7 @@ void point_store_destroy(point_store_t *store);
 
 /* 更新遥信点值。 */
 void point_store_update_yx(point_store_t *store,
+                           const char *gateway_name,
                            uint16_t common_address,
                            uint32_t ioa,
                            int value,
@@ -21,6 +22,7 @@ void point_store_update_yx(point_store_t *store,
 
 /* 更新遥测点值。 */
 void point_store_update_yc(point_store_t *store,
+                           const char *gateway_name,
                            uint16_t common_address,
                            uint32_t ioa,
                            double value,
@@ -29,6 +31,7 @@ void point_store_update_yc(point_store_t *store,
 
 /* 更新电能累计量并识别突发值。 */
 void point_store_update_energy(point_store_t *store,
+                               const char *gateway_name,
                                uint16_t common_address,
                                uint32_t ioa,
                                double value,

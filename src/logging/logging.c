@@ -1,6 +1,7 @@
-#include "logging.h"
+#include "logging/logging.h"
 
 #include <errno.h>
+#include <pthread.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <string.h>
@@ -13,6 +14,7 @@ static FILE *g_log_fp;
 static FILE *g_debug_log_fp;
 static int g_daemon_mode;
 static int g_debug_level = 1;
+static pthread_mutex_t g_log_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 /* 递归创建目录，确保日志文件所在目录存在。 */
 static int mkdir_recursive(const char *dir)
@@ -145,6 +147,7 @@ int log_init(const char *log_file, const char *debug_log_file, int daemon_mode, 
 /* 关闭日志文件句柄，释放日志模块占用的资源。 */
 void log_close(void)
 {
+    pthread_mutex_lock(&g_log_mutex);
     if (g_log_fp != NULL) {
         fclose(g_log_fp);
         g_log_fp = NULL;
@@ -153,6 +156,7 @@ void log_close(void)
         fclose(g_debug_log_fp);
         g_debug_log_fp = NULL;
     }
+    pthread_mutex_unlock(&g_log_mutex);
 }
 
 /* 按等级过滤并输出日志，DEBUG 写入独立文件，普通日志写入主日志文件。 */
@@ -164,7 +168,10 @@ void log_write(log_level_t level, const char *fmt, ...)
     FILE *targets[2];
     size_t target_count = 0;
 
+    pthread_mutex_lock(&g_log_mutex);
+
     if (level < minimum_log_level()) {
+        pthread_mutex_unlock(&g_log_mutex);
         return;
     }
 
@@ -196,4 +203,6 @@ void log_write(log_level_t level, const char *fmt, ...)
         fputc('\n', targets[i]);
         fflush(targets[i]);
     }
+
+    pthread_mutex_unlock(&g_log_mutex);
 }

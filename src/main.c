@@ -1,8 +1,8 @@
-#include "config.h"
-#include "iec104.h"
-#include "logging.h"
-#include "point_store.h"
-#include "process.h"
+#include "config/config.h"
+#include "iec104/iec104.h"
+#include "logging/logging.h"
+#include "point_store/point_store.h"
+#include "process/process.h"
 
 #include <errno.h>
 #include <getopt.h>
@@ -115,10 +115,8 @@ int main(int argc, char **argv)
     }
 
     log_write(LOG_LEVEL_INFO,
-              "iec104-master started slave=%s:%u ca=%u daemon=%d debug_level=%d",
-              config.slave_host,
-              config.slave_port,
-              config.common_address,
+              "iec104-master started gateways=%zu daemon=%d debug_level=%d",
+              config.gateway_count,
               config.daemonize,
               config.debug_level);
 
